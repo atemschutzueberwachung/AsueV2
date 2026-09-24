@@ -509,11 +509,23 @@ function isReadOnlyRole(){ const r=getRole(); return r==='einsatzleiter' || r===
     return out;
   }
 
+  // Fingerabdruck (SHA-256) des Lizenzcodes: hängt Einsätze an die Feuerwehr, ohne den Code selbst abzulegen
+  async function licenseHash(){
+    try{
+      const lic=getLicense();
+      const code=String((lic&&(lic.code||lic.lizenz_code))||'').trim().toUpperCase();
+      if(!code || !(window.crypto && crypto.subtle)) return null;
+      const buf=await crypto.subtle.digest('SHA-256', new TextEncoder().encode('asue-hist:'+code));
+      return Array.from(new Uint8Array(buf)).map(b=>b.toString(16).padStart(2,'0')).join('');
+    }catch(e){ return null; }
+  }
+
   async function cloudCreateEinsatz(s){
     const client=cloudClient();
     if(!client || !currentSession || !s?.einsatz) return null;
     const code=s.einsatz.code || makeEinsatzCode();
     s.einsatz.code=code;
+    const lizenz_hash=await licenseHash();
     const row={
       einsatz_code:code,
       einsatzort:s.einsatz.ort || 'Ohne Angabe',
@@ -522,6 +534,7 @@ function isReadOnlyRole(){ const r=getRole(); return r==='einsatzleiter' || r===
       atemschutzueberwachung:s.einsatz.leiter || '',
       status:'aktiv',
       erstellt_von:currentSession.user.id,
+      lizenz_hash,
       zustand:s
     };
     const {data,error}=await client.from('einsaetze').insert(row).select('id,einsatz_code').single();
@@ -1102,7 +1115,7 @@ function isReadOnlyRole(){ const r=getRole(); return r==='einsatzleiter' || r===
 
     app.innerHTML = `
       <header class="top">
-        <div class="brand"><div><h1>Atemschutzüberwachung</h1><div class="creator-inline">Created by Henning Ludwig <span class="version-inline">• Version 1.1.7</span></div></div><span class="sub">Live</span><span class="cloud-badge">● Mehrgeräte-Cloud</span></div>
+        <div class="brand"><div><h1>Atemschutzüberwachung</h1><div class="creator-inline">Created by Henning Ludwig <span class="version-inline">• Version 1.1.8</span></div></div><span class="sub">Live</span><span class="cloud-badge">● Mehrgeräte-Cloud</span></div>
         <div style="display:flex; gap:8px;">
           <button class="btn small" id="btn-role">${esc(roleLabel())}</button><button class="btn small" id="btn-history">Gespeicherte Einsätze</button><button class="btn small" id="btn-einsatz-qr">QR-Code</button>
           <button class="btn small" id="btn-nachweis">Nachweis / Export</button>
@@ -1890,7 +1903,8 @@ function isReadOnlyRole(){ const r=getRole(); return r==='einsatzleiter' || r===
       </div>`;
     document.body.appendChild(overlay);
     const list = overlay.querySelector('#history-list');
-    if(!history.length){
+        const drawList = ()=>{
+if(!history.length){
       list.innerHTML='<div class="empty">Noch keine abgeschlossenen Einsätze gespeichert.</div>';
     } else {
       list.innerHTML = history.map((e,i)=>{
@@ -1914,6 +1928,27 @@ function isReadOnlyRole(){ const r=getRole(); return r==='einsatzleiter' || r===
         btn.onclick = ()=> exportCSV(history[+btn.dataset.i]);
       });
     }
+    };
+    drawList();
+
+    // Abgeschlossene Einsätze der Feuerwehr aus der Cloud ergänzen (Hintergrund, blockiert nichts)
+    (async()=>{
+      try{
+        const client=cloudClient(); const lh=await licenseHash();
+        if(!client || !currentSession || !lh || !navigator.onLine) return;
+        const {data,error}=await client.rpc('historie_laden',{p_hash:lh});
+        if(error || !Array.isArray(data)) return;
+        const ids=new Set(history.map(x=>x?.einsatz?.id));
+        let added=0;
+        data.forEach(z=>{
+          if(z?.einsatz && !ids.has(z.einsatz.id)){ history.push(z); ids.add(z.einsatz.id); added++; try{ saveHistory(z); }catch(e){} }
+        });
+        if(added && document.body.contains(overlay)){
+          history.sort((a,b)=>String(b.einsatz?.datum||'').localeCompare(String(a.einsatz?.datum||'')));
+          drawList();
+        }
+      }catch(e){ console.warn('Cloud-Historie nicht geladen:',e); }
+    })();
     overlay.querySelector('#hist-close').onclick = ()=>overlay.remove();
   }
 
