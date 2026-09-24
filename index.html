@@ -233,7 +233,14 @@ async function checkLicense(){
   }catch(e){ return licenseStatus(); }
   if(http>=500 || !d || typeof d.ok!=='boolean') return licenseStatus();
   const cur=getLicense()||lic;
-  if(d.ok===true){ cur.letztePruefung=Date.now(); cur.gesperrt=false; delete cur.sperrGrund; }
+  if(d.ok===true){
+    cur.letztePruefung=Date.now(); cur.gesperrt=false; delete cur.sperrGrund;
+    // Verlängerung übernehmen: Laufzeit/Feuerwehr aus der Serverantwort, falls mitgeliefert
+    const src=(d.lizenz&&typeof d.lizenz==='object') ? d.lizenz : ((d.license&&typeof d.license==='object') ? d.license : d);
+    if(typeof src.gueltig_bis==='string' && src.gueltig_bis) cur.gueltig_bis=src.gueltig_bis;
+    if(typeof src.feuerwehr==='string' && src.feuerwehr) cur.feuerwehr=src.feuerwehr;
+    if(typeof src.geraete_name==='string' && src.geraete_name) cur.geraete_name=src.geraete_name;
+  }
   else { cur.gesperrt=true; cur.sperrGrund=d.error||''; }
   saveLicense(cur);
   return licenseStatus();
@@ -333,7 +340,11 @@ function renderLicenseSetup(){
         });
         const d=await r.json();
         if(d.ok){
-          saveLicense(Object.assign({},d,{letztePruefung:Date.now(),gesperrt:false}));
+          const eingegebenerName=((document.getElementById('lic-name')||{}).value||'').trim();
+          saveLicense(Object.assign({},d,{
+            geraete_name: d.geraete_name || d.device_name || eingegebenerName,
+            letztePruefung:Date.now(), gesperrt:false
+          }));
           render();
         }else msg.textContent=d.error||'Fehler';
       }catch(e){msg.textContent='Lizenzserver nicht erreichbar';}
@@ -1091,7 +1102,7 @@ function isReadOnlyRole(){ const r=getRole(); return r==='einsatzleiter' || r===
 
     app.innerHTML = `
       <header class="top">
-        <div class="brand"><div><h1>Atemschutzüberwachung</h1><div class="creator-inline">Created by Henning Ludwig <span class="version-inline">• Version 1.1.4</span></div></div><span class="sub">Live</span><span class="cloud-badge">● Mehrgeräte-Cloud</span></div>
+        <div class="brand"><div><h1>Atemschutzüberwachung</h1><div class="creator-inline">Created by Henning Ludwig <span class="version-inline">• Version 1.1.6</span></div></div><span class="sub">Live</span><span class="cloud-badge">● Mehrgeräte-Cloud</span></div>
         <div style="display:flex; gap:8px;">
           <button class="btn small" id="btn-role">${esc(roleLabel())}</button><button class="btn small" id="btn-history">Gespeicherte Einsätze</button><button class="btn small" id="btn-einsatz-qr">QR-Code</button>
           <button class="btn small" id="btn-nachweis">Nachweis / Export</button>
