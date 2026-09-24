@@ -1012,9 +1012,11 @@ function isReadOnlyRole(){ const r=getRole(); return r==='einsatzleiter' || r===
           <button class="btn" style="flex:1" id="btn-join-einsatz">Einsatz beitreten</button>
           <button class="btn primary" style="flex:1" id="btn-scan-einsatz-qr">📷 QR-Code scannen</button>
         </div>
+        <button class="btn ghost small" style="width:100%;margin-top:10px;" id="btn-setup-history">Gespeicherte Einsätze</button>
         <div id="setup-msg" style="color:var(--red);font-size:13px;margin-top:12px;min-height:18px;"></div>
         <div style="margin-top:16px;text-align:center;color:var(--text-dim);font-size:11px;">Rolle auf diesem Tablet: ${esc(roleLabel())}</div>
       </div>`;
+    document.getElementById('btn-setup-history').onclick = openHistoryModal;
     document.getElementById('btn-start-einsatz').onclick = async ()=>{
       const btn=document.getElementById('btn-start-einsatz');
       const msg=document.getElementById('setup-msg');
@@ -1089,7 +1091,7 @@ function isReadOnlyRole(){ const r=getRole(); return r==='einsatzleiter' || r===
 
     app.innerHTML = `
       <header class="top">
-        <div class="brand"><div><h1>Atemschutzüberwachung</h1><div class="creator-inline">Created by Henning Ludwig <span class="version-inline">• Version 1.1.3</span></div></div><span class="sub">Live</span><span class="cloud-badge">● Mehrgeräte-Cloud</span></div>
+        <div class="brand"><div><h1>Atemschutzüberwachung</h1><div class="creator-inline">Created by Henning Ludwig <span class="version-inline">• Version 1.1.4</span></div></div><span class="sub">Live</span><span class="cloud-badge">● Mehrgeräte-Cloud</span></div>
         <div style="display:flex; gap:8px;">
           <button class="btn small" id="btn-role">${esc(roleLabel())}</button><button class="btn small" id="btn-history">Gespeicherte Einsätze</button><button class="btn small" id="btn-einsatz-qr">QR-Code</button>
           <button class="btn small" id="btn-nachweis">Nachweis / Export</button>
